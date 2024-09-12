@@ -158,7 +158,7 @@ where
     move || keyed(each(), key.clone(), children.clone())
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "ssr"))]
 mod tests {
     use crate::prelude::*;
     use leptos_macro::view;
