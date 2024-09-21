@@ -1,6 +1,6 @@
 use super::{
     add_attr::AddAnyAttr, Mountable, Position, PositionState, Render,
-    RenderHtml, ToTemplate,
+    RenderHtml, ToTemplate, WrappedView,
 };
 use crate::{
     html::attribute::{Attribute, AttributeKey, AttributeValue, NextAttribute},
@@ -11,19 +11,6 @@ use std::marker::PhantomData;
 
 /// An attribute for which both the key and the value are known at compile time,
 /// i.e., as `&'static str`s.
-///
-/// ```
-/// use tachydom::{
-///     html::attribute::{Attribute, Type},
-///     view::static_types::{static_attr, StaticAttr},
-/// };
-/// let input_type = static_attr::<Type, "text">();
-/// let mut buf = String::new();
-/// let mut classes = String::new();
-/// let mut styles = String::new();
-/// input_type.to_html(&mut buf, &mut classes, &mut styles);
-/// assert_eq!(buf, " type=\"text\"");
-/// ```
 #[derive(Debug)]
 pub struct StaticAttr<K: AttributeKey, const V: &'static str> {
     ty: PhantomData<K>,
@@ -229,7 +216,7 @@ impl<R, const V: &'static str> AddAnyAttr<R> for Static<V>
 where
     R: Renderer,
 {
-    type Output<SomeNewAttr: Attribute<R>> = Static<V>;
+    type Output<SomeNewAttr: Attribute<R>> = WrappedView<Static<V>>;
 
     fn add_any_attr<NewAttr: Attribute<R>>(
         self,
@@ -238,9 +225,7 @@ where
     where
         Self::Output<NewAttr>: RenderHtml<R>,
     {
-        // TODO: there is a strange compiler thing that seems to prevent us returning Self here,
-        // even though we've already said that Output is always the same as Self
-        todo!()
+        WrappedView::new(self)
     }
 }
 

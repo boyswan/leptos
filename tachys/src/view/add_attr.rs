@@ -1,4 +1,4 @@
-use super::RenderHtml;
+use super::{BoxedView, RenderHtml, WrappedView};
 use crate::{html::attribute::Attribute, renderer::Renderer};
 
 /// Allows adding a new attribute to some type, before it is rendered.
@@ -43,4 +43,40 @@ macro_rules! no_attrs {
             }
         }
     };
+}
+
+impl<T, Rndr> AddAnyAttr<Rndr> for BoxedView<T>
+where
+    T: AddAnyAttr<Rndr> + Send,
+    Rndr: Renderer,
+{
+    type Output<SomeNewAttr: Attribute<Rndr>> = T::Output<SomeNewAttr>;
+
+    fn add_any_attr<NewAttr: Attribute<Rndr>>(
+        self,
+        attr: NewAttr,
+    ) -> Self::Output<NewAttr>
+    where
+        Self::Output<NewAttr>: RenderHtml<Rndr>,
+    {
+        self.into_inner().add_any_attr(attr)
+    }
+}
+
+impl<T, Rndr> AddAnyAttr<Rndr> for WrappedView<T>
+where
+    T: AddAnyAttr<Rndr> + Send,
+    Rndr: Renderer,
+{
+    type Output<SomeNewAttr: Attribute<Rndr>> = T::Output<SomeNewAttr>;
+
+    fn add_any_attr<NewAttr: Attribute<Rndr>>(
+        self,
+        attr: NewAttr,
+    ) -> Self::Output<NewAttr>
+    where
+        Self::Output<NewAttr>: RenderHtml<Rndr>,
+    {
+        self.into_inner().add_any_attr(attr)
+    }
 }

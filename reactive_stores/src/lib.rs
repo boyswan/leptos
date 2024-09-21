@@ -38,21 +38,33 @@ pub use store_field::{StoreField, Then};
 pub use subfield::Subfield;
 
 #[derive(Debug, Default)]
-struct TriggerMap(FxHashMap<StorePath, ArcTrigger>);
+struct TriggerMap(FxHashMap<StorePath, StoreFieldTrigger>);
+
+#[derive(Debug, Clone, Default)]
+pub struct StoreFieldTrigger {
+    pub this: ArcTrigger,
+    pub children: ArcTrigger,
+}
+
+impl StoreFieldTrigger {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
 
 impl TriggerMap {
-    fn get_or_insert(&mut self, key: StorePath) -> ArcTrigger {
+    fn get_or_insert(&mut self, key: StorePath) -> StoreFieldTrigger {
         if let Some(trigger) = self.0.get(&key) {
             trigger.clone()
         } else {
-            let new = ArcTrigger::new();
+            let new = StoreFieldTrigger::new();
             self.0.insert(key, new.clone());
             new
         }
     }
 
     #[allow(unused)]
-    fn remove(&mut self, key: &StorePath) -> Option<ArcTrigger> {
+    fn remove(&mut self, key: &StorePath) -> Option<StoreFieldTrigger> {
         self.0.remove(key)
     }
 }
@@ -240,13 +252,17 @@ where
 
 impl<T: 'static> Track for ArcStore<T> {
     fn track(&self) {
-        self.get_trigger(Default::default()).track();
+        let trigger = self.get_trigger(Default::default());
+        trigger.this.track();
+        trigger.children.track();
     }
 }
 
 impl<T: 'static> Notify for ArcStore<T> {
     fn notify(&self) {
-        self.get_trigger(self.path().into_iter().collect()).notify();
+        self.get_trigger(self.path().into_iter().collect())
+            .this
+            .notify();
     }
 }
 
@@ -365,9 +381,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        self as reactive_stores, Patch, Store, StoreField, StoreFieldIterator,
-    };
+    use crate::{self as reactive_stores, Patch, Store, StoreFieldIterator};
     use reactive_graph::{
         effect::Effect,
         traits::{Read, ReadUntracked, Set, Update, Writeable},
@@ -454,18 +468,6 @@ mod tests {
         tick().await;
         // the effect reads from `user`, so it should trigger every time
         assert_eq!(combined_count.load(Ordering::Relaxed), 4);
-
-        store
-            .todos()
-            .write()
-            .push(Todo::new("Create reactive stores"));
-        tick().await;
-        store.todos().write().push(Todo::new("???"));
-        tick().await;
-        store.todos().write().push(Todo::new("Profit!"));
-        tick().await;
-        // the effect doesn't read from `todos`, so the count should not have changed
-        assert_eq!(combined_count.load(Ordering::Relaxed), 4);
     }
 
     #[tokio::test]
@@ -496,8 +498,41 @@ mod tests {
         tick().await;
         store.user().update(|name| name.push_str("!!!"));
         tick().await;
-        // the effect reads from `user`, so it should trigger every time
+        // the effect reads from `todos`, so it shouldn't trigger every time
         assert_eq!(combined_count.load(Ordering::Relaxed), 1);
+    }
+
+    #[tokio::test]
+    async fn changes_do_notify_parent() {
+        _ = any_spawner::Executor::init_tokio();
+
+        let combined_count = Arc::new(AtomicUsize::new(0));
+
+        let store = Store::new(data());
+
+        Effect::new_sync({
+            let combined_count = Arc::clone(&combined_count);
+            move |prev: Option<()>| {
+                if prev.is_none() {
+                    println!("first run");
+                } else {
+                    println!("next run");
+                }
+                println!("{:?}", *store.read());
+                combined_count.fetch_add(1, Ordering::Relaxed);
+            }
+        });
+        tick().await;
+        tick().await;
+        store.user().set("Greg".into());
+        tick().await;
+        store.user().set("Carol".into());
+        tick().await;
+        store.user().update(|name| name.push_str("!!!"));
+        tick().await;
+        store.todos().write().clear();
+        tick().await;
+        assert_eq!(combined_count.load(Ordering::Relaxed), 5);
     }
 
     #[tokio::test]
