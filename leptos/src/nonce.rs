@@ -65,10 +65,7 @@ impl Display for Nonce {
     }
 }
 
-impl AttributeValue for Nonce
-where
-    R: Renderer,
-{
+impl AttributeValue for Nonce {
     type AsyncOutput = Self;
     type State = <Arc<str> as AttributeValue>::State;
     type Cloneable = Self;
@@ -87,12 +84,12 @@ where
     fn hydrate<const FROM_SERVER: bool>(
         self,
         key: &str,
-        el: &<R as Renderer>::Element,
+        el: &web_sys::Element,
     ) -> Self::State {
         <Arc<str> as AttributeValue>::hydrate::<FROM_SERVER>(self.0, key, el)
     }
 
-    fn build(self, el: &<R as Renderer>::Element, key: &str) -> Self::State {
+    fn build(self, el: &web_sys::Element, key: &str) -> Self::State {
         <Arc<str> as AttributeValue>::build(self.0, el, key)
     }
 
