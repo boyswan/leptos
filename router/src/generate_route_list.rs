@@ -220,12 +220,9 @@ impl RouteList {
         static GENERATED: RefCell<Option<RouteList>> = const { RefCell::new(None) };
     }
 
-    pub fn generate<T, Rndr>(app: impl FnOnce() -> T) -> Option<Self>
+    pub fn generate<T>(app: impl FnOnce() -> T) -> Option<Self>
     where
         T: RenderHtml,
-        Rndr: Renderer,
-        Rndr::Node: Clone,
-        Rndr::Element: Clone,
     {
         Self::IS_GENERATING.set(true);
         // run the app once, but throw away the HTML
